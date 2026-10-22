@@ -1,25 +1,28 @@
-import mongoose from "mongoose";    
+import mongoose from "mongoose";
 
 const resourceSchema = new mongoose.Schema({
-    name:{
+    name: {
         type: String,
-        required: true              
+        required: true,
+        trim: true
     },
 
-    quantity:{
+    unitNumber: {
         type: Number,
-        required: true
+        required: true,
+        index: true
     },
 
-    status:{ 
+    status: {
         type: String,
-        enum:["available", "broken"],
+        enum: ["available", "broken"],
         default: "available"
     },
 
-    timestamps: true
+},
+    { timestamps: true });
 
+resourceSchema.index({ name: 1, unitNumber: 1 }, { unique: true });
 
-});
 
 export default mongoose.model("resource", resourceSchema);

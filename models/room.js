@@ -2,29 +2,23 @@ import mongoose from "mongoose";
 
 const roomSchema = new mongoose.Schema({
 
-    name:{
+    name: {
         type: String,
         required: true
     },
 
-    capacity:{
-        type: Number,
-        required: true
-    },
-    
-    floor:{
+    capacity: {
         type: Number,
         required: true
     },
 
-    resources:{
-        type: [String],
+    floor: {
+        type: Number,
         required: true
     },
 
-    timestamps: true
 
-
-});
+},
+    { timestamps: true });
 
 export default mongoose.model("room", roomSchema);
