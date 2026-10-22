@@ -21,7 +21,7 @@ export default function RoomDetailsPage() {
     <>
       <PageHeader title={room?.name || "Room details"} description="Room information returned by the backend." />
       <ErrorMessage>{error}</ErrorMessage>
-      {room && <section className="panel detail-panel"><dl className="detail-list"><div><dt>Capacity</dt><dd>{room.capacity} people</dd></div><div><dt>Floor</dt><dd>{room.floor}</dd></div><div><dt>Availability</dt><dd>Not provided by the backend</dd></div></dl><Link className="button button-primary" to="/book">Book a room</Link></section>}
+      {room && <section className="panel detail-panel"><dl className="detail-list"><div><dt>Capacity</dt><dd>{room.capacity} people</dd></div><div><dt>Floor</dt><dd>{room.floor}</dd></div><div><dt>Availability</dt><dd>Not provided by the backend</dd></div><div><dt>Assigned resources</dt><dd>Not provided by the backend</dd></div></dl><Link className="button button-primary" to={`/book?roomId=${encodeURIComponent(room._id)}`}>Book this room</Link></section>}
     </>
   );
 }

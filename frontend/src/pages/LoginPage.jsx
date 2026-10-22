@@ -8,6 +8,7 @@ export default function LoginPage() {
   const { session, login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -49,7 +50,7 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="form-stack">
           <ErrorMessage>{error}</ErrorMessage>
           <label>Email address<input type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} required /></label>
-          <label>Password<input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label>
+          <label>Password<div className="password-input"><input type={showPassword ? "text" : "password"} autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required /><button type="button" className="password-toggle" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? "Hide" : "Show"}</button></div></label>
           <button className="button button-primary button-full" type="submit" disabled={loading}>{loading ? "Signing in..." : "Sign in"}</button>
         </form>
         <p className="login-footnote">Use the account provided by your administrator.</p>

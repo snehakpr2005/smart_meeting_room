@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "npm --prefix frontend run dev",
     "start": "node server.js",
+    "seed": "node seed.js",
     "test": "node --test"
   },
   "keywords": [],
