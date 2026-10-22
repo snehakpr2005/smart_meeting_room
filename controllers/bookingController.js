@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import booking from "../models/booking.js";
 import room from "../models/room.js";
 import resource from "../models/resource.js";
+import { assignWaitingListIfAvailable } from "./waitingListController.js";
 
 export const createBooking = async (req, res) => {
     try {
@@ -105,6 +106,7 @@ export const createBooking = async (req, res) => {
             date,
             startTime,
             endTime,
+            attendees: attendees ? Number(attendees) : 1,
             status: "confirmed",
             resources: finalResources
         });
@@ -215,6 +217,18 @@ export const cancelBooking = async (req, res) => {
 
         foundBooking.status = "cancelled";
         await foundBooking.save();
+
+        // Check and assign waiting list candidates
+        try {
+            await assignWaitingListIfAvailable(
+                foundBooking.roomId,
+                foundBooking.date,
+                foundBooking.startTime,
+                foundBooking.endTime
+            );
+        } catch (assignErr) {
+            console.error("Auto-assign error on cancellation:", assignErr.message);
+        }
 
         return res.status(200).json({
             message: "booking cancelled successfully",

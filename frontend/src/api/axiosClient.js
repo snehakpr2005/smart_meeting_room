@@ -147,4 +147,14 @@ export const bookingApi = {
   checkInBooking: (id) => axiosClient.put(`/booking/checkedin/${id}`),
 };
 
+export const waitingListApi = {
+  getWaitingList: async () => {
+    const response = await axiosClient.get('/waiting-list');
+    return response.data?.data || [];
+  },
+  joinWaitingList: (data) => axiosClient.post('/waiting-list/join', data),
+  leaveWaitingList: (id) => axiosClient.put(`/waiting-list/leave/${id}`),
+};
+
 export default axiosClient;
+

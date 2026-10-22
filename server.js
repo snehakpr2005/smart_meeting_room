@@ -6,6 +6,7 @@ import userRoutes from "./routes/userRoutes.js";
 import roomRoutes from "./routes/roomRoutes.js"
 import resourceRoutes from "./routes/resourceRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
+import waitingListRoutes from "./routes/waitingListRoutes.js";
 import cookieParser from "cookie-parser";
 import "./scheduler/cron.js";
 
@@ -34,6 +35,7 @@ app.use("/user/auth",userRoutes);
 app.use("/resource",resourceRoutes);
 app.use("/room",roomRoutes);
 app.use("/booking",bookingRoutes);
+app.use("/waiting-list",waitingListRoutes);
 
 
 const PORT = process.env.PORT || 5000;

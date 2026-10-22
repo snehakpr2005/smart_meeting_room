@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { roomApi, bookingApi } from '../api/axiosClient';
+import { roomApi, bookingApi, waitingListApi } from '../api/axiosClient';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
 import AlertBanner from '../components/AlertBanner';
@@ -15,66 +16,60 @@ import {
   AlertCircle,
   Info,
   ArrowRight,
+  RotateCw,
 } from 'lucide-react';
-
-const STORAGE_KEY = 'smart_room_waiting_list';
 
 const WaitingList = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [rooms, setRooms] = useState([]);
   const [bookings, setBookings] = useState([]);
-
   const [waitingList, setWaitingList] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
 
-  // Form
+  // Form Fields
   const [roomId, setRoomId] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [startTime, setStartTime] = useState('10:00');
   const [endTime, setEndTime] = useState('11:00');
+  const [attendees, setAttendees] = useState(2);
   const [notes, setNotes] = useState('');
 
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Load rooms and persistent queue
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const [roomsData, bookingsData] = await Promise.all([
-          roomApi.getAllRooms(),
-          bookingApi.getAllBookings(),
-        ]);
-        setRooms(roomsData);
-        setBookings(bookingsData);
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setErrorMsg('');
+      const [roomsData, bookingsData, queueData] = await Promise.all([
+        roomApi.getAllRooms(),
+        bookingApi.getAllBookings(),
+        waitingListApi.getWaitingList(),
+      ]);
 
-        if (roomsData.length > 0) {
-          setRoomId(roomsData[0]._id);
-        }
+      setRooms(roomsData);
+      setBookings(bookingsData);
+      setWaitingList(queueData);
 
-        // Retrieve local queue
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-          setWaitingList(JSON.parse(saved));
-        }
-      } catch (err) {
-        setErrorMsg('Failed to load waiting list prerequisites: ' + (err.response?.data?.message || err.message));
-      } finally {
-        setLoading(false);
+      if (roomsData.length > 0 && !roomId) {
+        setRoomId(roomsData[0]._id);
       }
-    };
+    } catch (err) {
+      setErrorMsg('Failed to load waiting list from database: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchData();
   }, []);
 
-  const saveQueue = (newList) => {
-    setWaitingList(newList);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newList));
-  };
-
-  const handleJoinWaitingList = (e) => {
+  const handleJoinWaitingList = async (e) => {
     e.preventDefault();
     if (!roomId || !date || !startTime || !endTime) {
       setErrorMsg('Please fill in all time slot fields.');
@@ -86,43 +81,54 @@ const WaitingList = () => {
       return;
     }
 
-    const targetRoom = rooms.find((r) => r._id === roomId);
+    try {
+      setActionLoading(true);
+      setErrorMsg('');
+      const res = await waitingListApi.joinWaitingList({
+        roomId,
+        date,
+        startTime,
+        endTime,
+        attendees: Number(attendees),
+        notes: notes.trim(),
+      });
 
-    const newRequest = {
-      id: Date.now().toString(),
-      roomId,
-      roomName: targetRoom?.name || 'Meeting Room',
-      floor: targetRoom?.floor,
-      date,
-      startTime,
-      endTime,
-      notes,
-      userEmail: user?.email,
-      department: user?.department,
-      status: 'waiting', // 'waiting' | 'assigned'
-      createdAt: new Date().toISOString(),
-    };
-
-    const updated = [newRequest, ...waitingList];
-    saveQueue(updated);
-    setSuccessMsg(`Joined waiting list queue for ${targetRoom?.name}.`);
-    setModalOpen(false);
-    setNotes('');
+      setSuccessMsg(res.data?.message || 'Joined waiting list in MongoDB successfully!');
+      setModalOpen(false);
+      setNotes('');
+      await fetchData();
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || 'Failed to join waiting list');
+    } finally {
+      setActionLoading(false);
+    }
   };
 
-  const handleLeaveWaitingList = (id) => {
-    const updated = waitingList.filter((item) => item.id !== id);
-    saveQueue(updated);
-    setSuccessMsg('You have left the waiting list queue.');
+  const handleLeaveWaitingList = async (id) => {
+    try {
+      setActionLoading(true);
+      setErrorMsg('');
+      const res = await waitingListApi.leaveWaitingList(id);
+      setSuccessMsg(res.data?.message || 'Removed from waiting list in database.');
+      await fetchData();
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || 'Failed to leave waiting list');
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   // Inspect slot availability against real bookings
   const checkSlotFree = (item) => {
+    if (item.status === 'assigned') return false;
+    const targetRoomId = item.roomId?._id || item.roomId;
+    const targetDateStr = item.date ? new Date(item.date).toISOString().split('T')[0] : '';
+
     const conflict = bookings.find((b) => {
       if (b.status !== 'confirmed') return false;
       const bDate = new Date(b.date).toISOString().split('T')[0];
-      const sameRoom = (b.roomId?._id || b.roomId) === item.roomId;
-      const sameDate = bDate === item.date;
+      const sameRoom = (b.roomId?._id || b.roomId) === targetRoomId;
+      const sameDate = bDate === targetDateStr;
       const overlap = item.startTime < b.endTime && item.endTime > b.startTime;
       return sameRoom && sameDate && overlap;
     });
@@ -134,14 +140,18 @@ const WaitingList = () => {
     <div>
       <div className="page-header">
         <div className="page-header-info">
-          <h1>Waiting List Queue</h1>
+          <h1>Waiting List Queue (MongoDB Persisted)</h1>
           <p>
-            Join queues for high-demand conference rooms. When a booked meeting is cancelled or auto-released
-            by the 15-minute no-show scheduler, slots are reassigned.
+            Join queues for high-demand conference rooms. When a booking is cancelled or auto-released
+            by the 15-minute no-show scheduler, slots are reassigned directly in MongoDB.
           </p>
         </div>
 
         <div className="page-header-actions">
+          <button className="btn btn-secondary btn-sm" onClick={fetchData} disabled={actionLoading}>
+            <RotateCw size={16} />
+            <span>Refresh</span>
+          </button>
           <button className="btn btn-primary" onClick={() => setModalOpen(true)}>
             <PlusCircle size={18} />
             <span>Join Waiting List</span>
@@ -164,20 +174,20 @@ const WaitingList = () => {
       >
         <Info size={22} style={{ flexShrink: 0, marginTop: '0.1rem' }} />
         <div style={{ fontSize: '0.88rem', lineHeight: 1.5 }}>
-          <strong>Automated Priority & Release Integration:</strong> The backend scheduler cron (
-          <code>scheduler/cron.js</code>) checks every minute for meetings whose start time has exceeded 15
-          minutes without a confirmed employee check-in. When auto-cancellation occurs, the slot is immediately
-          freed for waiting list members.
+          <strong>Real-Time MongoDB Integration & Auto-Assignment:</strong> Waiting list entries are saved in
+          MongoDB in the <code>waitinglists</code> collection. When any booking is cancelled or auto-cancelled by
+          the 15-minute no-show cron scheduler (<code>scheduler/cron.js</code>), the backend automatically assigns
+          the freed slot to the earliest eligible queued requester and converts it into a confirmed booking!
         </div>
       </div>
 
       {loading ? (
-        <LoadingSpinner text="Checking queue and room availability..." />
+        <LoadingSpinner text="Checking queue and room availability from database..." />
       ) : waitingList.length === 0 ? (
         <EmptyState
           icon={Clock}
           title="No Active Waiting List Requests"
-          description="You are not currently in line for any fully-booked meeting rooms."
+          description="There are currently no active waiting list requests recorded in MongoDB."
           actionLabel="Request a Room Slot"
           onAction={() => setModalOpen(true)}
         />
@@ -190,29 +200,33 @@ const WaitingList = () => {
                 <th>Desired Date</th>
                 <th>Time Window</th>
                 <th>Requester</th>
-                <th>Slot Availability Status</th>
+                <th>Status in MongoDB</th>
                 <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {waitingList.map((item) => {
                 const isNowFree = checkSlotFree(item);
+                const roomObj = item.roomId || {};
+                const userObj = item.userId || {};
 
                 return (
-                  <tr key={item.id}>
+                  <tr key={item._id}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <DoorOpen size={18} color="#2563eb" />
                         <div>
-                          <strong>{item.roomName}</strong>
-                          <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Floor {item.floor}</div>
+                          <strong>{roomObj.name || 'Conference Room'}</strong>
+                          <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                            Floor {roomObj.floor ?? '1'} • Capacity {roomObj.capacity ?? 'N/A'}
+                          </div>
                         </div>
                       </div>
                     </td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
                         <Calendar size={14} color="#64748b" />
-                        <span>{item.date}</span>
+                        <span>{item.date ? new Date(item.date).toLocaleDateString() : 'N/A'}</span>
                       </div>
                     </td>
                     <td>
@@ -222,15 +236,26 @@ const WaitingList = () => {
                     </td>
                     <td>
                       <div>
-                        <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{item.userEmail}</div>
-                        <div style={{ fontSize: '0.78rem', color: '#64748b' }}>{item.department}</div>
+                        <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>
+                          {userObj.email || user?.email}
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                          {userObj.department || user?.department}
+                        </div>
                       </div>
                     </td>
                     <td>
-                      {isNowFree ? (
+                      {item.status === 'assigned' ? (
                         <span className="badge badge-available">
                           <CheckCircle size={12} />
-                          Slot Now Free! Ready to Book
+                          Auto-Assigned! (Booking Created)
+                        </span>
+                      ) : item.status === 'cancelled' ? (
+                        <span className="badge badge-cancelled">Cancelled / Left</span>
+                      ) : isNowFree ? (
+                        <span className="badge badge-available">
+                          <CheckCircle size={12} />
+                          Slot Now Free! Ready to Claim
                         </span>
                       ) : (
                         <span className="badge badge-waiting">
@@ -241,25 +266,30 @@ const WaitingList = () => {
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                        {isNowFree && (
+                        {item.status === 'waiting' && isNowFree && (
                           <button
                             className="btn btn-primary btn-sm"
                             onClick={() =>
-                              (window.location.href = `/book?room=${item.roomId}&date=${item.date}`)
+                              navigate('/book', {
+                                state: { preselectedRoomId: roomObj._id },
+                              })
                             }
                           >
                             <span>Claim Slot</span>
                             <ArrowRight size={14} />
                           </button>
                         )}
-                        <button
-                          className="btn btn-outline-danger btn-sm"
-                          onClick={() => handleLeaveWaitingList(item.id)}
-                          title="Leave Queue"
-                        >
-                          <Trash2 size={14} />
-                          <span>Leave</span>
-                        </button>
+                        {item.status === 'waiting' && (
+                          <button
+                            className="btn btn-outline-danger btn-sm"
+                            disabled={actionLoading}
+                            onClick={() => handleLeaveWaitingList(item._id)}
+                            title="Leave Queue"
+                          >
+                            <Trash2 size={14} />
+                            <span>Leave</span>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -274,14 +304,14 @@ const WaitingList = () => {
       <Modal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
-        title="Join Meeting Room Waiting List"
+        title="Join Meeting Room Waiting List (Saved to MongoDB)"
         footer={
           <>
-            <button className="btn btn-secondary" onClick={() => setModalOpen(false)}>
+            <button className="btn btn-secondary" onClick={() => setModalOpen(false)} disabled={actionLoading}>
               Cancel
             </button>
-            <button className="btn btn-primary" onClick={handleJoinWaitingList}>
-              Add to Queue
+            <button className="btn btn-primary" onClick={handleJoinWaitingList} disabled={actionLoading}>
+              {actionLoading ? 'Saving...' : 'Add to MongoDB Queue'}
             </button>
           </>
         }
@@ -305,18 +335,31 @@ const WaitingList = () => {
             </select>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">
-              Desired Date <span className="required">*</span>
-            </label>
-            <input
-              type="date"
-              className="form-control"
-              min={new Date().toISOString().split('T')[0]}
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-            />
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">
+                Desired Date <span className="required">*</span>
+              </label>
+              <input
+                type="date"
+                className="form-control"
+                min={new Date().toISOString().split('T')[0]}
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Attendees</label>
+              <input
+                type="number"
+                min="1"
+                className="form-control"
+                value={attendees}
+                onChange={(e) => setAttendees(e.target.value)}
+              />
+            </div>
           </div>
 
           <div className="form-row">

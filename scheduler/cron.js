@@ -1,5 +1,6 @@
 import nodeCron from "node-cron";
 import booking from "../models/booking.js";
+import { assignWaitingListIfAvailable } from "../controllers/waitingListController.js";
 
 nodeCron.schedule("* * * * *", async () => {
     console.log("Running booking scheduler...")
@@ -31,6 +32,12 @@ nodeCron.schedule("* * * * *", async () => {
             b.status = "cancelled";
             await b.save();
             console.log(`Booking ${b._id} auto-cancelled - no check-in`);
+
+            try {
+                await assignWaitingListIfAvailable(b.roomId, b.date, b.startTime, b.endTime);
+            } catch (err) {
+                console.error("Scheduler auto-assignment error:", err.message);
+            }
         }
     }
 });

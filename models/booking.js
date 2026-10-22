@@ -38,7 +38,11 @@ const bookingSchema = new mongoose.Schema({
         type:Boolean,
         default:false
     },
-    
+
+    attendees: {
+        type: Number,
+        default: 1
+    },
 
     resources: [
         {
