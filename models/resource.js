@@ -19,6 +19,13 @@ const resourceSchema = new mongoose.Schema({
         default: "available"
     },
 
+    bookings: [
+        {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "booking"
+        }
+    ]
+
 },
     { timestamps: true });
 

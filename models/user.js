@@ -28,6 +28,13 @@ const userSchema = new mongoose.Schema({
         enum: ["employee", "admin", "facility_manager"],
     },
 
+    bookings: [
+        {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "booking"
+        }
+    ]
+
 }, { timestamps: true });
 
 export default mongoose.model("user", userSchema);

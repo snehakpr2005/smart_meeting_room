@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 import booking from "../models/booking.js";
 import room from "../models/room.js";
 import resource from "../models/resource.js";
+import user from "../models/user.js";
+import waitingList from "../models/waitingList.js";
 import { assignWaitingListIfAvailable } from "./waitingListController.js";
 
 export const createBooking = async (req, res) => {
@@ -110,6 +112,41 @@ export const createBooking = async (req, res) => {
             status: "confirmed",
             resources: finalResources
         });
+
+        // 1. Update User document in database
+        await user.findByIdAndUpdate(bookedBy, {
+            $addToSet: { bookings: newBooking._id }
+        });
+
+        // 2. Update Room document in database
+        await room.findByIdAndUpdate(roomId, {
+            $addToSet: { bookings: newBooking._id }
+        });
+
+        // 3. Update Resource document(s) in database
+        if (finalResources && finalResources.length > 0) {
+            const resourceIds = finalResources.map(r => r.resourceId);
+            await resource.updateMany(
+                { _id: { $in: resourceIds } },
+                { $addToSet: { bookings: newBooking._id } }
+            );
+        }
+
+        // 4. Update WaitingList document in database if this user had an active waiting queue entry
+        await waitingList.updateMany(
+            {
+                roomId,
+                userId: bookedBy,
+                date,
+                status: "waiting",
+                startTime: { $lt: endTime },
+                endTime: { $gt: startTime }
+            },
+            {
+                status: "assigned",
+                assignedBookingId: newBooking._id
+            }
+        );
 
         return res.status(201).json({
             message: "booking created successfully",

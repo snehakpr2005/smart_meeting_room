@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import waitingList from "../models/waitingList.js";
 import room from "../models/room.js";
 import booking from "../models/booking.js";
+import user from "../models/user.js";
 
 export const joinWaitingList = async (req, res) => {
     try {
@@ -179,6 +180,14 @@ export const assignWaitingListIfAvailable = async (roomId, date, startTime, endT
             attendees: waitingCandidate.attendees || 1,
             status: "confirmed",
             resources: []
+        });
+
+        // Update User & Room documents in MongoDB
+        await user.findByIdAndUpdate(waitingCandidate.userId, {
+            $addToSet: { bookings: newBooking._id }
+        });
+        await room.findByIdAndUpdate(roomId, {
+            $addToSet: { bookings: newBooking._id }
         });
 
         // Update waiting list document in MongoDB

@@ -233,6 +233,25 @@ async function runDatabaseVerification() {
     console.log('  -> Status in DB:', dbBooking.status);
     console.log('  -> Checked In:', dbBooking.checkedIn);
     console.log('  -> Resources assigned count:', dbBooking.resources.length);
+
+    // Verify all related models schema have been updated and saved in database
+    const updatedUser = await userModel.findById(dbUser._id);
+    const updatedRoom = await roomModel.findById(createdRoomId);
+    const updatedResource = await resourceModel.findById(createdResId);
+
+    const userHasBooking = updatedUser.bookings?.some(b => b.toString() === createdBookingId);
+    const roomHasBooking = updatedRoom.bookings?.some(b => b.toString() === createdBookingId);
+    const resourceHasBooking = updatedResource.bookings?.some(b => b.toString() === createdBookingId);
+
+    if (userHasBooking && roomHasBooking && resourceHasBooking) {
+      console.log('MongoDB Cross-Model Persistence: ALL model schemas saved & linked in database!');
+      console.log('  -> "users" collection updated with booking reference:', userHasBooking);
+      console.log('  -> "rooms" collection updated with booking reference:', roomHasBooking);
+      console.log('  -> "resources" collection updated with booking reference:', resourceHasBooking);
+    } else {
+      throw new Error(`Model schema persistence failed! User: ${userHasBooking}, Room: ${roomHasBooking}, Resource: ${resourceHasBooking}`);
+    }
+
     results.bookingCreation = true;
   } else {
     throw new Error('Booking record not found or attributes missing in MongoDB!');
@@ -407,7 +426,7 @@ async function runDatabaseVerification() {
   console.log('2. User Authentication & JWT Claims:           [PASSED] (Collection: "users")');
   console.log('3. Room Management (Create, Read, Update):     [PASSED] (Collection: "rooms")');
   console.log('4. Resource Management (Create, Status Toggle):[PASSED] (Collection: "resources")');
-  console.log('5. Room Booking & Attendees Persistence:       [PASSED] (Collection: "bookings")');
+  console.log('5. Room Booking Multi-Model Persistence:      [PASSED] (Collections: "bookings", "users", "rooms", "resources")');
   console.log('6. Booking Check-In Persistence:               [PASSED] (Collection: "bookings")');
   console.log('7. Booking Cancellation Persistence:           [PASSED] (Collection: "bookings")');
   console.log('8. Waiting List Queue Persistence:             [PASSED] (Collection: "waitinglists")');
