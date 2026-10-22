@@ -1,43 +1,38 @@
 import jwt from "jsonwebtoken";
 
 export const authMiddleware = async (req, res, next) => {
-
     const authHeader = req.headers.authorization;
-    if (!authHeader) {
+    const match = typeof authHeader === "string" ? authHeader.match(/^Bearer\s+(\S+)$/i) : null;
+    if (!match) {
         return res.status(401).json({
-            message: "no token provided or invalid format"
+            message: "A valid Bearer token is required"
         });
     }
 
-
-    // const token = authHeader.split(" ")[1];
-    // if (!token) {
-    //     console.log("token needed");
-    //     return res.status(401).json({
-    //         message: "no token provided"
-    //     })
-    // }
-
     try {
-        const decoded = jwt.verify(authHeader.split(" ")[1], process.env.ACCESS_TOKEN);
+        const decoded = jwt.verify(match[1], process.env.ACCESS_TOKEN);
+        if (
+            typeof decoded.userId !== "string" ||
+            !["employee", "admin", "facility_manager"].includes(decoded.role)
+        ) {
+            return res.status(401).json({
+                message: "Invalid access token"
+            });
+        }
         req.user = decoded;
-        next();
+        return next();
+    } catch {
+        return res.status(401).json({ message: "Invalid or expired access token" });
     }
-
-    catch (err) {   
-        return res.status(401).json({ message: err.message });
-    }
-}
+};
 
 export const authorizeRoles = (...roles) => {
     return (req, res, next) => {
-
-        if (!roles.includes(req.user.role)) {
+        if (!req.user || !roles.includes(req.user.role)) {
             return res.status(403).json({
-                message: "access denies:insufficient permissions"
+                message: "Access denied: insufficient permissions"
             });
         }
-        next();
-    }
-
-}
+        return next();
+    };
+};

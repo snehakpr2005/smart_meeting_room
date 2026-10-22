@@ -5,6 +5,8 @@ const api = axios.create({
   withCredentials: true,
 });
 
+let refreshPromise = null;
+
 api.interceptors.request.use((config) => {
   const token = window.sessionStorage.getItem("accessToken");
   if (token) {
@@ -15,11 +17,44 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401 && window.sessionStorage.getItem("accessToken")) {
-      window.dispatchEvent(new Event("auth:expired"));
+  async (error) => {
+    const request = error.config;
+    const hasSession = window.sessionStorage.getItem("accessToken");
+    if (error.response?.status !== 401 || !hasSession || !request || request._retry || request.url?.includes("/user/auth/")) {
+      if (error.response?.status === 401 && hasSession) {
+        window.sessionStorage.removeItem("accessToken");
+        window.dispatchEvent(new Event("auth:expired"));
+      }
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+
+    request._retry = true;
+    try {
+      if (!refreshPromise) {
+        refreshPromise = axios.post(
+          `${api.defaults.baseURL}/user/auth/refreshToken`,
+          {},
+          { withCredentials: true },
+        ).then((response) => {
+          const token = response.data?.accessToken;
+          if (!response.data?.success || !token) {
+            throw new Error(response.data?.message || "Could not refresh the session.");
+          }
+          window.sessionStorage.setItem("accessToken", token);
+          return token;
+        }).finally(() => {
+          refreshPromise = null;
+        });
+      }
+
+      const token = await refreshPromise;
+      request.headers.Authorization = `Bearer ${token}`;
+      return api(request);
+    } catch (refreshError) {
+      window.sessionStorage.removeItem("accessToken");
+      window.dispatchEvent(new Event("auth:expired"));
+      return Promise.reject(refreshError);
+    }
   },
 );
 

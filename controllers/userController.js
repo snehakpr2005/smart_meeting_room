@@ -53,6 +53,13 @@ const tokenGenerate = (userId, role) => {
   return { accessToken, refreshToken };
 };
 
+const getRefreshCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  path: "/"
+});
+
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -84,10 +91,7 @@ export const loginUser = async (req, res) => {
     await existingUser.save();
 
     res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "strict",
-      path: "/",
+      ...getRefreshCookieOptions(),
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
@@ -124,8 +128,7 @@ export const refreshAccessToken = async (req, res) => {
     }
 
     if (existingUser.refreshToken !== refreshToken) {
-      res.clearCookie("refreshToken",
-        { path: "/", httpOnly: true, secure: true });
+      res.clearCookie("refreshToken", getRefreshCookieOptions());
 
       return res.status(403).json({
         success: false,
@@ -134,12 +137,12 @@ export const refreshAccessToken = async (req, res) => {
     }
 
     const newAccessToken = jwt.sign(
-      { id: decoded.userId },
+      { userId: existingUser._id.toString(), role: existingUser.role },
       process.env.ACCESS_TOKEN,
-      { expiresIn: "15m" }
+      { expiresIn: "20m" }
     );
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       accessToken: newAccessToken
     });
@@ -167,9 +170,7 @@ export const logoutUser = async (req, res) => {
     }
     catch (err) {
       res.clearCookie("refreshToken", {
-        path: "/",
-        httpOnly: true,
-        secure: true
+        ...getRefreshCookieOptions()
       });
       return res.status(403).json({
         success: false,
@@ -188,9 +189,7 @@ export const logoutUser = async (req, res) => {
 
     if (checkUser.refreshToken !== refreshToken) {
       res.clearCookie("refreshToken", {
-        path: "/",
-        httpOnly: true,
-        secure: true
+        ...getRefreshCookieOptions()
       });
       return res.status(403).json({
         success: false,
@@ -199,11 +198,7 @@ export const logoutUser = async (req, res) => {
     }
     checkUser.refreshToken = null;
     await checkUser.save();
-    res.clearCookie("refreshToken", {
-      path: "/",
-      httpOnly: true,
-      secure: true
-    });
+    res.clearCookie("refreshToken", getRefreshCookieOptions());
 
     res.status(200).json({
       success: true,
