@@ -200,6 +200,7 @@ const MyBookings = () => {
             <thead>
               <tr>
                 <th>Room Details</th>
+                <th>Title / Purpose</th>
                 <th>Date</th>
                 <th>Time Window</th>
                 <th>Allocated Equipment</th>
@@ -219,6 +220,11 @@ const MyBookings = () => {
                           Floor {b.roomId?.floor ?? 'N/A'} • Capacity {b.roomId?.capacity ?? 'N/A'}
                         </div>
                       </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155', maxWidth: 160 }}>
+                      {b.title || <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>No title</span>}
                     </div>
                   </td>
                   <td>

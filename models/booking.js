@@ -44,6 +44,11 @@ const bookingSchema = new mongoose.Schema({
         default: 1
     },
 
+    title: {
+        type: String,
+        default: "Team Meeting"
+    },
+
     resources: [
         {
             resourceId: {

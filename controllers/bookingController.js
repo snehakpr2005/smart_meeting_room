@@ -8,7 +8,7 @@ import { assignWaitingListIfAvailable } from "./waitingListController.js";
 
 export const createBooking = async (req, res) => {
     try {
-        const { roomId, date, startTime, endTime, attendees, resources } = req.body;
+        const { roomId, date, startTime, endTime, attendees, resources, title } = req.body;
         const bookedBy = req.user.userId;
 
         if (!roomId || !date || !startTime || !endTime) {
@@ -51,7 +51,9 @@ export const createBooking = async (req, res) => {
         for (const existing of existingRoomBookings) {
             if (startTime < existing.endTime && endTime > existing.startTime) {
                 return res.status(409).json({
-                    message: "room is already booked for this time slot"
+                    message: "room is already booked for this time slot",
+                    conflictSuggestWaitingList: true,
+                    conflictDetails: { roomId, date, startTime, endTime, attendees }
                 });
             }
         }
@@ -110,6 +112,7 @@ export const createBooking = async (req, res) => {
             endTime,
             attendees: attendees ? Number(attendees) : 1,
             status: "confirmed",
+            title: title || "Team Meeting",
             resources: finalResources
         });
 

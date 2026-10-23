@@ -123,6 +123,8 @@ export const roomApi = {
   createRoom: (roomData) => axiosClient.post('/room/create', roomData),
   updateRoom: (id, roomData) => axiosClient.put(`/room/room/${id}`, roomData),
   deleteRoom: (id) => axiosClient.delete(`/room/room/${id}`),
+  getSuggestions: (params) => axiosClient.get('/room/suggestions', { params }),
+  getRoomAvailability: (roomId, date) => axiosClient.get('/room/availability', { params: { roomId, date } }),
 };
 
 export const resourceApi = {

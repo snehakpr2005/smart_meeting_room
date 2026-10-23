@@ -1047,3 +1047,30 @@ p {
 .mt-2 { margin-top: 0.5rem; }
 .mt-4 { margin-top: 1rem; }
 .mb-4 { margin-bottom: 1rem; }
+
+/* Spin animation for loading indicators */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Notification bell hover */
+.notif-bell-btn:hover {
+  background: var(--slate-100) !important;
+  border-color: var(--slate-300) !important;
+}
+
+/* Suggestion panel quick-action buttons hover */
+.suggestion-btn:hover {
+  background: #fef3c7 !important;
+  transform: translateY(-1px);
+}
+
+/* Queue badge pulse for position #1 */
+@keyframes queuePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(124, 58, 237, 0); }
+}

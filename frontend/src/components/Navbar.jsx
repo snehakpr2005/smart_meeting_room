@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, Activity, User, Menu } from 'lucide-react';
+import { LogOut, User, Menu } from 'lucide-react';
+import NotificationBell from './NotificationBell';
 
 const Navbar = ({ onToggleSidebar }) => {
   const { user, logout } = useAuth();
@@ -36,6 +37,9 @@ const Navbar = ({ onToggleSidebar }) => {
       </div>
 
       <div className="navbar-right">
+        {/* Notification Bell */}
+        <NotificationBell />
+
         {/* User profile card */}
         <div className="user-profile-widget">
           <div className="user-avatar">
